@@ -1,0 +1,32 @@
+﻿name: Canon Guard
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  canon-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect Canon Changes Without Version Tag
+        run: |
+          set -e
+          BASE=$(git merge-base origin/main HEAD)
+
+          CANON_CHANGED=$(git diff --name-only $BASE HEAD | grep -E '(MARKET_CANON.md|PORTFOLIO_CANON.md|SIGNAL_CANON.md|README_CANON.md)' || true)
+          TAG_ON_HEAD=$(git tag --points-at HEAD)
+
+          if [ -n "$CANON_CHANGED" ] && [ -z "$TAG_ON_HEAD" ]; then
+            echo "❌ Canon files changed without version tag:"
+            echo "$CANON_CHANGED"
+            echo ""
+            echo "Action required: create a new Canon tag (e.g., canon-v2, market-canon-v2)."
+            exit 1
+          fi
+
+          echo "✅ Canon integrity preserved."
