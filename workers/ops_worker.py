@@ -28,7 +28,7 @@ if not PG_CONN:
 # ============================================================
 # CONFIG
 # ============================================================
-BINANCE_WS_URL   = "wss://stream.binance.us:9443/ws/btcusdt@trade"
+BINANCE_WS_URL   = "wss://ws.coincap.io/prices?assets=bitcoin,ethereum,solana"
 BTCUSDT_ASSET_ID = "22222222-2222-2222-2222-222222222222"
 STARTING_CASH    = 100000
 FLUSH_INTERVAL   = 5
@@ -96,14 +96,16 @@ class OpsWorker:
                 logging.error(f"DB WRITE FAILED: {e}")
 
     async def market_loop(self):
-        logging.info("Connecting to Binance...")
-        async with websockets.connect(BINANCE_WS_URL) as ws:
-            logging.info("Binance LIVE")
-            async for msg in ws:
-                trade = json.loads(msg)
-                self.last_price = Decimal(trade["p"])
-                self.last_size  = Decimal(trade["q"])
-                self.last_ts    = datetime.fromtimestamp(trade["T"] / 1000, tz=timezone.utc)
+    logging.info("Connecting to CoinCap...")
+    url = "wss://ws.coincap.io/prices?assets=bitcoin,ethereum,solana"
+    async with websockets.connect(url) as ws:
+        logging.info("CoinCap LIVE")
+        async for msg in ws:
+            data = json.loads(msg)
+            if "bitcoin" in data:
+                self.last_price = Decimal(data["bitcoin"])
+                self.last_size  = Decimal("0")
+                self.last_ts    = datetime.now(tz=timezone.utc)
 
     async def run(self):
         await self.connect_db()
