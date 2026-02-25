@@ -1,0 +1,1 @@
+worker: python workers/ops_worker.py
