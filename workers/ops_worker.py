@@ -5,6 +5,7 @@ import logging
 from pathlib import Path
 from datetime import datetime, timezone
 from decimal import Decimal
+
 import asyncpg
 import websockets
 from dotenv import load_dotenv
@@ -28,12 +29,16 @@ if not PG_CONN:
 # ============================================================
 # CONFIG
 # ============================================================
-BINANCE_WS_URL   = "wss://ws.coincap.io/prices?assets=bitcoin,ethereum,solana"
+COINCAP_WS_URL = "wss://ws.coincap.io/prices?assets=bitcoin,ethereum,solana"
 BTCUSDT_ASSET_ID = "22222222-2222-2222-2222-222222222222"
-STARTING_CASH    = 100000
-FLUSH_INTERVAL   = 5
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+STARTING_CASH  = 100000
+FLUSH_INTERVAL = 5
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s"
+)
 
 # ============================================================
 # WORKER
@@ -46,6 +51,7 @@ class OpsWorker:
         self.last_ts    = None
         self.cash       = STARTING_CASH
 
+    # ---------------- DB ----------------
     async def connect_db(self):
         logging.info("Connecting to DB...")
         self.pool = await asyncpg.create_pool(
@@ -59,10 +65,12 @@ class OpsWorker:
     async def write_tick(self):
         if self.last_price is None:
             return
+
         try:
             await self.pool.execute(
                 """
-                INSERT INTO market.ticks_v1 (symbol_id, event_ts, last_price, last_size, created_at)
+                INSERT INTO market.ticks_v1
+                (symbol_id, event_ts, last_price, last_size, created_at)
                 VALUES ($1, $2, $3, $4, now())
                 """,
                 BTCUSDT_ASSET_ID,
@@ -70,7 +78,9 @@ class OpsWorker:
                 self.last_price,
                 self.last_size,
             )
+
         except Exception:
+            # UPSERT FALLBACK
             await self.pool.execute(
                 """
                 UPDATE market.ticks_v1
@@ -79,7 +89,7 @@ class OpsWorker:
                     event_ts   = $4,
                     created_at = now()
                 WHERE symbol_id = $1
-                AND $4 > event_ts
+                  AND $4 > event_ts
                 """,
                 BTCUSDT_ASSET_ID,
                 self.last_price,
@@ -95,24 +105,40 @@ class OpsWorker:
             except Exception as e:
                 logging.error(f"DB WRITE FAILED: {e}")
 
+    # ---------------- MARKET DATA ----------------
     async def market_loop(self):
-    logging.info("Connecting to CoinCap...")
-    url = "wss://ws.coincap.io/prices?assets=bitcoin,ethereum,solana"
-    async with websockets.connect(url) as ws:
-        logging.info("CoinCap LIVE")
-        async for msg in ws:
-            data = json.loads(msg)
-            if "bitcoin" in data:
-                self.last_price = Decimal(data["bitcoin"])
-                self.last_size  = Decimal("0")
-                self.last_ts    = datetime.now(tz=timezone.utc)
+        logging.info("Connecting to CoinCap...")
 
+        while True:
+            try:
+                async with websockets.connect(
+                    COINCAP_WS_URL,
+                    ping_interval=20,
+                    ping_timeout=20
+                ) as ws:
+
+                    logging.info("CoinCap LIVE")
+
+                    async for msg in ws:
+                        data = json.loads(msg)
+
+                        if "bitcoin" in data:
+                            self.last_price = Decimal(data["bitcoin"])
+                            self.last_size  = Decimal("0")
+                            self.last_ts    = datetime.now(timezone.utc)
+
+            except Exception as e:
+                logging.error(f"WS ERROR → reconnecting in 3s: {e}")
+                await asyncio.sleep(3)
+
+    # ---------------- RUNNER ----------------
     async def run(self):
         await self.connect_db()
         logging.info("OPS WORKER STARTED")
+
         await asyncio.gather(
             self.market_loop(),
-            self.flusher()
+            self.flusher(),
         )
 
 # ============================================================
