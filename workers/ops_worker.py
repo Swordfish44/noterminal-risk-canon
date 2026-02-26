@@ -80,7 +80,6 @@ class OpsWorker:
             )
 
         except Exception:
-            # UPSERT FALLBACK
             await self.pool.execute(
                 """
                 UPDATE market.ticks_v1
