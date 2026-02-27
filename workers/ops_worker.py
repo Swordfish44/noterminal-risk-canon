@@ -72,29 +72,20 @@ class OpsWorker:
                 INSERT INTO market.ticks_v1
                 (symbol_id, event_ts, last_price, last_size, created_at)
                 VALUES ($1, $2, $3, $4, now())
-                """,
-                BTCUSDT_ASSET_ID,
-                self.last_ts,
-                self.last_price,
-                self.last_size,
-            )
-
-        except Exception:
-            await self.pool.execute(
-                """
-                UPDATE market.ticks_v1
-                SET last_price = $2,
-                    last_size  = $3,
-                    event_ts   = $4,
+                ON CONFLICT (symbol_id) DO UPDATE
+                SET last_price = EXCLUDED.last_price,
+                    last_size  = EXCLUDED.last_size,
+                    event_ts   = EXCLUDED.event_ts,
                     created_at = now()
-                WHERE symbol_id = $1
-                  AND $4 > event_ts
+                WHERE EXCLUDED.event_ts > market.ticks_v1.event_ts
                 """,
                 BTCUSDT_ASSET_ID,
+                self.last_ts,
                 self.last_price,
                 self.last_size,
-                self.last_ts,
             )
+        except Exception as e:
+            logging.error(f"DB WRITE FAILED: {e}")
 
     async def flusher(self):
         while True:
