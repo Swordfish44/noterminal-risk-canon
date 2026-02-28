@@ -32,7 +32,9 @@ SYNC_INTERVAL = 10  # seconds between sync cycles
 #   ticks_raw_v1 → last_price_v1 (DISTINCT ON symbol_id ORDER BY event_ts DESC)
 #                → position_market_value_v1 (positions JOIN last_price_v1)
 TICK_TO_SYMBOL: dict[UUID, UUID] = {
-    UUID("22222222-2222-2222-2222-222222222222"): UUID("d85b4396-20a5-4f47-91fa-d83b802734b5"),  # BTC/USDT
+    UUID("22222222-2222-2222-2222-222222222222"): UUID("d85b4396-20a5-4f47-91fa-d83b802734b5"),  # BTC/USD
+    UUID("33333333-3333-3333-3333-333333333333"): UUID("60f3954d-6fbf-427f-8670-e666c873b2e5"),  # ETH/USD
+    UUID("44444444-4444-4444-4444-444444444444"): UUID("37c9a4dc-438e-4366-8e73-35460f21bec8"),  # SOL/USD
 }
 
 logging.basicConfig(
