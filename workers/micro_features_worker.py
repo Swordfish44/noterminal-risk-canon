@@ -85,12 +85,14 @@ WITH ranked AS (
 SELECT
     bucket_ts,
     symbol_id,
-    COUNT(*)::int                                          AS trade_count,
-    COUNT(*)::float8                                       AS trade_intensity,
-    STDDEV(last_price)::float8                             AS micro_vol,
-    SUM(last_size * SIGN(COALESCE(price_diff, 0)))::float8 AS ofi,
-    AVG(last_size)::float8                                 AS avg_trade_size,
-    AVG(last_price)                                        AS mid
+    COUNT(*)::int                                                        AS trade_count,
+    COUNT(*)::float8                                                     AS trade_intensity,
+    STDDEV(last_price)::float8                                           AS micro_vol,
+    SUM(last_size * SIGN(COALESCE(price_diff, 0)))::float8               AS ofi,
+    AVG(last_size)::float8                                               AS avg_trade_size,
+    AVG(last_price)                                                      AS mid,
+    SUM(CASE WHEN side = 'buy'  THEN last_size ELSE 0 END)::float8      AS buy_vol,
+    SUM(CASE WHEN side = 'sell' THEN last_size ELSE 0 END)::float8      AS sell_vol
 FROM ranked
 GROUP BY bucket_ts, symbol_id
 ORDER BY bucket_ts, symbol_id
@@ -107,16 +109,20 @@ INSERT INTO market.micro_features_1s_v1 (
     micro_vol,
     ofi,
     avg_trade_size,
-    mid
+    mid,
+    buy_vol,
+    sell_vol
 )
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 ON CONFLICT (bucket_ts, symbol_id) DO UPDATE SET
     trade_count     = EXCLUDED.trade_count,
     trade_intensity = EXCLUDED.trade_intensity,
     micro_vol       = EXCLUDED.micro_vol,
     ofi             = EXCLUDED.ofi,
     avg_trade_size  = EXCLUDED.avg_trade_size,
-    mid             = EXCLUDED.mid
+    mid             = EXCLUDED.mid,
+    buy_vol         = EXCLUDED.buy_vol,
+    sell_vol        = EXCLUDED.sell_vol
 """
 
 
@@ -139,6 +145,8 @@ async def run_cycle(pool: asyncpg.Pool) -> int:
                 r["ofi"],
                 r["avg_trade_size"],
                 r["mid"],
+                r["buy_vol"],
+                r["sell_vol"],
             )
             for r in rows
         ]
