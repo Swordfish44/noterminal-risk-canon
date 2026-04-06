@@ -69,40 +69,36 @@ class PortfolioSyncWorker:
         )
 
     # ---------------- WRITE ----------------
-    async def forward_to_raw(self, ticks: list) -> int:
-        """
-        Translate CoinCap symbol_ids to canonical market.symbols_v1 UUIDs
-        and insert into market.ticks_raw_v1.
+async def forward_to_raw(self, ticks: list) -> int:
+    inserted = 0
+    for tick in ticks:
+        canonical = TICK_TO_SYMBOL.get(tick["symbol_id"])
+        if canonical is None:
+            log.warning("No symbol mapping for tick symbol_id=%s", tick["symbol_id"])
+            continue
 
-        ticks_raw_v1 PK is (symbol_id, event_ts) — ON CONFLICT DO NOTHING
-        skips rows already written for an unchanged tick.
+        result = await self.pool.execute(
+            """
+            INSERT INTO market.ticks_raw_v1
+                (symbol_id, event_ts, last_price, last_size,
+                 side, is_maker, created_at)
+            VALUES ($1, $2, $3, $4, $5, $6, now())
+            ON CONFLICT (symbol_id, event_ts) DO UPDATE
+            SET
+                side     = EXCLUDED.side,
+                is_maker = EXCLUDED.is_maker
+            """,
+            canonical,
+            tick["event_ts"],
+            tick["last_price"],
+            tick["last_size"],
+            tick.get("side"),      # None for now — ops_worker doesn't pass it yet
+            tick.get("is_maker"),  # None for now
+        )
+        n = int(result.split()[-1])
+        inserted += n
 
-        Returns the number of rows actually inserted.
-        """
-        inserted = 0
-        for tick in ticks:
-            canonical = TICK_TO_SYMBOL.get(tick["symbol_id"])
-            if canonical is None:
-                log.warning("No symbol mapping for tick symbol_id=%s", tick["symbol_id"])
-                continue
-
-            result = await self.pool.execute(
-                """
-                INSERT INTO market.ticks_raw_v1
-                    (symbol_id, event_ts, last_price, last_size, created_at)
-                VALUES ($1, $2, $3, $4, now())
-                ON CONFLICT (symbol_id, event_ts) DO NOTHING
-                """,
-                canonical,
-                tick["event_ts"],
-                tick["last_price"],
-                tick["last_size"],
-            )
-            # asyncpg returns "INSERT 0 N" — parse N
-            n = int(result.split()[-1])
-            inserted += n
-
-        return inserted
+    return inserted
 
     # ---------------- LOG PORTFOLIO STATE ----------------
     async def log_portfolio(self):
