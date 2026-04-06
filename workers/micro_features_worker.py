@@ -32,10 +32,8 @@ Env (optional, with defaults):
 import asyncio
 import logging
 import os
-import socket
 import time
 from pathlib import Path
-from urllib.parse import urlparse
 
 import asyncpg
 from dotenv import load_dotenv
@@ -47,11 +45,6 @@ PG_CONN = os.getenv("PG_CONN")
 if not PG_CONN:
     raise RuntimeError("PG_CONN is not set")
 
-_DB_PASSWORD = (
-    urlparse(PG_CONN).password
-    or os.environ.get("DB_PASSWORD")
-    or os.environ.get("PG_PASSWORD")
-)
 
 LOOKBACK_S       = int(os.getenv("MICRO_LOOKBACK_S",       "120"))
 LOOP_INTERVAL_S  = float(os.getenv("MICRO_LOOP_INTERVAL_S", "2"))
@@ -164,23 +157,10 @@ async def run_cycle(pool: asyncpg.Pool) -> int:
 
 
 async def main() -> None:
-    _parsed = urlparse(os.environ.get("PG_CONN", ""))
-    _ipv4 = socket.getaddrinfo(
-        "aws-0-us-east-2.pooler.supabase.com", 6543, socket.AF_INET
-    )[0][4][0]
-    log.info(
-        "DB connecting as user: %r to host: %r port: %r (resolved IPv4: %s)",
-        _parsed.username, _parsed.hostname, _parsed.port, _ipv4,
-    )
     pool = await asyncpg.create_pool(
-        host=_ipv4,
-        port=6543,
-        user=_parsed.username or "postgres.dtcmofpvixbkpwqvecid",
-        password=_DB_PASSWORD,
-        database="postgres",
-        ssl="require",
+        PG_CONN,
         min_size=1,
-        max_size=5,
+        max_size=3,
         statement_cache_size=0,
         command_timeout=30,
     )
