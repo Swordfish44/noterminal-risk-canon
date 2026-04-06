@@ -89,6 +89,13 @@ class OpsWorker:
     async def connect_db(self):
         logging.info("Connecting to DB...")
         _parsed = urlparse(os.environ.get("PG_CONN", ""))
+        logging.info("ENV DIAGNOSTIC:")
+        logging.info("  PG_CONN present: %s", bool(os.environ.get("PG_CONN")))
+        logging.info("  PG_CONN prefix: %r", os.environ.get("PG_CONN", "")[:40])
+        logging.info("  DB_PASSWORD present: %s", bool(os.environ.get("DB_PASSWORD")))
+        logging.info("  parsed user: %r", _parsed.username)
+        logging.info("  parsed host: %r", _parsed.hostname)
+        logging.info("  parsed port: %r", _parsed.port)
         _ipv4 = socket.getaddrinfo(
             "aws-0-us-east-2.pooler.supabase.com", 6543, socket.AF_INET
         )[0][4][0]
