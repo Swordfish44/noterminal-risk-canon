@@ -86,6 +86,7 @@ class OpsWorker:
             min_size=1,
             max_size=3,
             statement_cache_size=0,
+            prepared_statement_cache_size=0,
         )
         await self._load_ticks_raw_schema()
         logging.info("DB ready.")
@@ -122,23 +123,19 @@ class OpsWorker:
             try:
                 await self.pool.execute("""
                     INSERT INTO market.ticks_v1
-                        (symbol_id, event_ts, last_price, last_size, side, is_maker, created_at)
-                    VALUES ($1, $2, $3, $4, $5, $6, now())
+                        (symbol_id, event_ts, last_price, last_size, created_at)
+                    VALUES ($1, $2, $3, $4, now())
                     ON CONFLICT (symbol_id) DO UPDATE
                     SET last_price = EXCLUDED.last_price,
                         last_size  = EXCLUDED.last_size,
                         event_ts   = EXCLUDED.event_ts,
-                        side       = EXCLUDED.side,
-                        is_maker   = EXCLUDED.is_maker,
                         created_at = now()
                     WHERE EXCLUDED.event_ts > market.ticks_v1.event_ts
                 """,
                 str(symbol_id),
                 ts,
                 price,
-                size,
-                side,
-                is_maker)
+                size)
             except Exception as e:
                 logging.error("DB WRITE FAILED [%s]: %s", venue_sym, e)
 
