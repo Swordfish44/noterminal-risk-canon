@@ -6,7 +6,7 @@ from pathlib import Path
 from datetime import datetime, timezone
 from decimal import Decimal
 from uuid import UUID
-
+print("WORKER VERSION: side/is_maker ACTIVE", flush=True)
 import asyncpg
 import websockets
 from dotenv import load_dotenv
