@@ -7,6 +7,5 @@ set -euo pipefail
 python workers/ops_worker.py &
 python workers/portfolio_sync.py &
 python workers/micro_features_worker.py &
-python micro_features_worker.py &
 
 wait -n
