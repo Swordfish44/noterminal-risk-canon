@@ -86,7 +86,6 @@ class OpsWorker:
             min_size=1,
             max_size=3,
             statement_cache_size=0,
-            prepared_statement_cache_size=0,
         )
         await self._load_ticks_raw_schema()
         logging.info("DB ready.")
