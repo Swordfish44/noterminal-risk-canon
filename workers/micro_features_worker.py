@@ -73,6 +73,7 @@ WITH ranked AS (
         event_ts,
         last_price,
         last_size,
+        side,
         DATE_TRUNC('second', event_ts)                                  AS bucket_ts,
         last_price
             - LAG(last_price) OVER (

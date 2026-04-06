@@ -87,6 +87,8 @@ class OpsWorker:
             max_size=3,
             statement_cache_size=0,
         )
+        async with self.pool.acquire() as conn:
+            await conn.execute("DEALLOCATE ALL")
         await self._load_ticks_raw_schema()
         logging.info("DB ready.")
 
