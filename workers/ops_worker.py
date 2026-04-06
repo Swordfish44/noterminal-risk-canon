@@ -172,7 +172,7 @@ class OpsWorker:
                 self.prices[sym] = (dec_price, dec_size, event_ts)
                 canonical = KRAKEN_TO_CANONICAL.get(sym)
                 if canonical is not None:
-                    self.raw_trades.append((canonical, event_ts, dec_price, dec_size, side))
+                    self.raw_trades.append((canonical, event_ts, dec_price, dec_size, side, side == "sell"))
                 logging.info("TRADE %-9s  %s  qty=%s  side=%s", sym, price, size, side)
             else:  # ticker — fallback / fill-in
                 price = item.get("last")
