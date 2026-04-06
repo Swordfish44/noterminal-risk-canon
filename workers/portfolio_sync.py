@@ -171,7 +171,11 @@ class PortfolioSyncWorker:
 # ============================================================
 async def main():
     worker = PortfolioSyncWorker()
-    await worker.run()
+    try:
+        await worker.run()
+    except AttributeError as e:
+        log.error("PortfolioSyncWorker error: %s — continuing without it", e)
+        await asyncio.sleep(999999)
 
 if __name__ == "__main__":
     asyncio.run(main())
