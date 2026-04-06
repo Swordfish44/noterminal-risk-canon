@@ -164,13 +164,18 @@ async def run_cycle(pool: asyncpg.Pool) -> int:
 
 
 async def main() -> None:
+    _parsed = urlparse(os.environ.get("PG_CONN", ""))
     _ipv4 = socket.getaddrinfo(
         "aws-0-us-east-2.pooler.supabase.com", 6543, socket.AF_INET
     )[0][4][0]
+    log.info(
+        "DB connecting as user: %r to host: %r port: %r (resolved IPv4: %s)",
+        _parsed.username, _parsed.hostname, _parsed.port, _ipv4,
+    )
     pool = await asyncpg.create_pool(
         host=_ipv4,
         port=6543,
-        user=urlparse(os.environ.get("PG_CONN", "")).username or "postgres.dtcmofpvixbkpwqvecid",
+        user=_parsed.username or "postgres.dtcmofpvixbkpwqvecid",
         password=_DB_PASSWORD,
         database="postgres",
         ssl="require",
