@@ -32,8 +32,10 @@ Env (optional, with defaults):
 import asyncio
 import logging
 import os
+import socket
 import time
 from pathlib import Path
+from urllib.parse import urlparse
 
 import asyncpg
 from dotenv import load_dotenv
@@ -44,6 +46,12 @@ load_dotenv(ROOT_DIR / ".env")
 PG_CONN = os.getenv("PG_CONN")
 if not PG_CONN:
     raise RuntimeError("PG_CONN is not set")
+
+_DB_PASSWORD = (
+    urlparse(PG_CONN).password
+    or os.environ.get("DB_PASSWORD")
+    or os.environ.get("PG_PASSWORD")
+)
 
 LOOKBACK_S       = int(os.getenv("MICRO_LOOKBACK_S",       "120"))
 LOOP_INTERVAL_S  = float(os.getenv("MICRO_LOOP_INTERVAL_S", "2"))
@@ -91,8 +99,8 @@ SELECT
     SUM(last_size * SIGN(COALESCE(price_diff, 0)))::float8               AS ofi,
     AVG(last_size)::float8                                               AS avg_trade_size,
     AVG(last_price)                                                      AS mid,
-    SUM(CASE WHEN side = 'buy'  THEN last_size ELSE 0 END)::float8      AS buy_vol,
-    SUM(CASE WHEN side = 'sell' THEN last_size ELSE 0 END)::float8      AS sell_vol
+    SUM(CASE WHEN side::text IN ('1', 'buy', 'BUY') THEN last_size ELSE 0 END)::float8      AS buy_vol,
+    SUM(CASE WHEN side::text IN ('-1', 'sell', 'SELL') THEN last_size ELSE 0 END)::float8   AS sell_vol
 FROM ranked
 GROUP BY bucket_ts, symbol_id
 ORDER BY bucket_ts, symbol_id
@@ -156,11 +164,19 @@ async def run_cycle(pool: asyncpg.Pool) -> int:
 
 
 async def main() -> None:
+    _ipv4 = socket.getaddrinfo(
+        "aws-0-us-east-2.pooler.supabase.com", 6543, socket.AF_INET
+    )[0][4][0]
     pool = await asyncpg.create_pool(
-        PG_CONN,
+        host=_ipv4,
+        port=6543,
+        user="postgres.dtcmofpvixbkpwqvecid",
+        password=_DB_PASSWORD,
+        database="postgres",
+        ssl="require",
         min_size=1,
-        max_size=3,
-        statement_cache_size=0,  # required for Supabase
+        max_size=5,
+        statement_cache_size=0,
         command_timeout=30,
     )
     log.info(

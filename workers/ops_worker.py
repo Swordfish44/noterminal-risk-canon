@@ -2,10 +2,12 @@ import os
 import json
 import asyncio
 import logging
+import socket
 from collections import defaultdict, deque
 from pathlib import Path
 from datetime import datetime, timezone
 from decimal import Decimal
+from urllib.parse import urlparse
 from uuid import UUID
 print("WORKER VERSION: side/is_maker ACTIVE", flush=True)
 import asyncpg
@@ -27,6 +29,12 @@ if not FUND_ID:
     raise RuntimeError("FUND_ID missing from .env")
 if not PG_CONN:
     raise RuntimeError("PG_CONN missing from .env")
+
+_DB_PASSWORD = (
+    urlparse(PG_CONN).password
+    or os.environ.get("DB_PASSWORD")
+    or os.environ.get("PG_PASSWORD")
+)
 
 # ============================================================
 # CONFIG
@@ -80,10 +88,18 @@ class OpsWorker:
 
     async def connect_db(self):
         logging.info("Connecting to DB...")
+        _ipv4 = socket.getaddrinfo(
+            "aws-0-us-east-2.pooler.supabase.com", 6543, socket.AF_INET
+        )[0][4][0]
         self.pool = await asyncpg.create_pool(
-            dsn=PG_CONN,
+            host=_ipv4,
+            port=6543,
+            user="postgres.dtcmofpvixbkpwqvecid",
+            password=_DB_PASSWORD,
+            database="postgres",
+            ssl="require",
             min_size=1,
-            max_size=3,
+            max_size=5,
             statement_cache_size=0,
         )
         await self._load_ticks_raw_schema()

@@ -1,7 +1,9 @@
 import os
 import asyncio
 import logging
+import socket
 from pathlib import Path
+from urllib.parse import urlparse
 from uuid import UUID
 
 import asyncpg
@@ -18,6 +20,12 @@ print("RUNNING FILE:", __file__)
 
 if not PG_CONN:
     raise RuntimeError("PG_CONN missing from .env")
+
+_DB_PASSWORD = (
+    urlparse(PG_CONN).password
+    or os.environ.get("DB_PASSWORD")
+    or os.environ.get("PG_PASSWORD")
+)
 
 # ============================================================
 # CONFIG
@@ -53,10 +61,18 @@ class PortfolioSyncWorker:
     # ---------------- DB ----------------
     async def connect_db(self):
         log.info("Connecting to DB...")
+        _ipv4 = socket.getaddrinfo(
+            "aws-0-us-east-2.pooler.supabase.com", 6543, socket.AF_INET
+        )[0][4][0]
         self.pool = await asyncpg.create_pool(
-            dsn=PG_CONN,
+            host=_ipv4,
+            port=6543,
+            user="postgres.dtcmofpvixbkpwqvecid",
+            password=_DB_PASSWORD,
+            database="postgres",
+            ssl="require",
             min_size=1,
-            max_size=3,
+            max_size=5,
             statement_cache_size=0,
         )
         log.info("DB ready.")
