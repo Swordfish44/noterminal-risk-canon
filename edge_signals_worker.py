@@ -47,16 +47,17 @@ log = logging.getLogger("edge_signals_worker")
 # ── SQL ───────────────────────────────────────────────────────────────────────
 
 POLL_SQL = """
-SELECT symbol_id, bucket_ts, edge_score
+SELECT symbol_id, bucket_ts, edge_score, instrument_symbol
 FROM market.v_aelc_features_1s_v1
 WHERE edge_score >= %s
 """
 
 UPSERT_SQL = """
-INSERT INTO market.edge_signals_v1 (symbol_id, bucket_ts, edge_score)
+INSERT INTO market.edge_signals_v1 (symbol_id, bucket_ts, edge_score, instrument_symbol)
 VALUES %s
 ON CONFLICT (symbol_id, bucket_ts) DO UPDATE SET
-    edge_score = EXCLUDED.edge_score
+    edge_score         = EXCLUDED.edge_score,
+    instrument_symbol  = EXCLUDED.instrument_symbol
 """
 
 # ── Lifecycle ─────────────────────────────────────────────────────────────────
@@ -95,7 +96,15 @@ def run_cycle(conn) -> int:
         rows = cur.fetchall()
     if not rows:
         return 0
-    values = [(r["symbol_id"], r["bucket_ts"], r["edge_score"]) for r in rows]
+    values = [
+        (
+            r["symbol_id"],
+            r["bucket_ts"],
+            r["edge_score"],
+            r["instrument_symbol"] or str(r["symbol_id"]),
+        )
+        for r in rows
+    ]
     with conn.cursor() as cur:
         psycopg2.extras.execute_values(cur, UPSERT_SQL, values)
     conn.commit()
