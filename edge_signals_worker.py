@@ -1,5 +1,5 @@
 """
-micro_features_worker.py  (repo root)
+edge_signals_worker.py  (repo root)
 
 Polls market.v_aelc_features_1s_v1 every POLL_INTERVAL_S seconds.
 Rows with edge_score >= EDGE_THRESHOLD are upserted into market.edge_signals_v1.
@@ -42,7 +42,7 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s — %(message)s",
 )
-log = logging.getLogger("micro_features_worker")
+log = logging.getLogger("edge_signals_worker")
 
 # ── SQL ───────────────────────────────────────────────────────────────────────
 
