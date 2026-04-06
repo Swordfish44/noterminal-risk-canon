@@ -24,15 +24,19 @@ from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).resolve().parent / ".env")
 
-SUPABASE_DB_URL = os.getenv("SUPABASE_DB_URL")
+DB_URL = (
+    os.environ.get("SUPABASE_DB_URL")
+    or os.environ.get("PG_CONN")
+    or os.environ.get("DATABASE_URL")
+)
+if not DB_URL:
+    raise RuntimeError("No database URL found. Set SUPABASE_DB_URL, PG_CONN, or DATABASE_URL.")
+
 EDGE_THRESHOLD  = int(os.getenv("EDGE_THRESHOLD", "2"))
 POLL_INTERVAL_S = float(os.getenv("POLL_INTERVAL_S", "5"))
 
 BACKOFF_BASE_S = 3.0
 BACKOFF_MAX_S  = 60.0
-
-if not SUPABASE_DB_URL:
-    raise RuntimeError("SUPABASE_DB_URL is not set")
 
 logging.basicConfig(
     level=logging.INFO,
@@ -72,7 +76,7 @@ signal.signal(signal.SIGTERM, _handle_sigterm)
 def connect(backoff: float) -> "psycopg2.extensions.connection":
     while not _shutdown:
         try:
-            conn = psycopg2.connect(SUPABASE_DB_URL)
+            conn = psycopg2.connect(DB_URL)
             conn.autocommit = False
             log.info("Connected to DB")
             return conn
