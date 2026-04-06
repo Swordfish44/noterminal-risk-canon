@@ -170,7 +170,7 @@ async def main() -> None:
     pool = await asyncpg.create_pool(
         host=_ipv4,
         port=6543,
-        user="postgres.dtcmofpvixbkpwqvecid",
+        user=urlparse(os.environ.get("PG_CONN", "")).username or "postgres.dtcmofpvixbkpwqvecid",
         password=_DB_PASSWORD,
         database="postgres",
         ssl="require",
