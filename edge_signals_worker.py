@@ -150,6 +150,8 @@ def main():
 
         except Exception:
             log.exception("Unexpected error in cycle — continuing")
+            if conn and not conn.closed:
+                conn.rollback()
             time.sleep(POLL_INTERVAL_S)
 
     if conn and not conn.closed:
