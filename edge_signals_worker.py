@@ -47,17 +47,49 @@ log = logging.getLogger("edge_signals_worker")
 # ── SQL ───────────────────────────────────────────────────────────────────────
 
 POLL_SQL = """
-SELECT symbol_id, bucket_ts, edge_score, instrument_symbol
+SELECT
+    symbol_id, instrument_symbol, bucket_ts,
+    edge_label, edge_score, edge_direction,
+    is_flow_dominant, is_exhausted, is_toxic_entry, is_high_confidence,
+    net_flow, net_flow_z, ofi_normalised, ofi_z, toxicity_ratio,
+    flow_momentum, momentum_direction, persistence_seconds,
+    flow_direction, trade_count, total_vol, vwap, mid_price
 FROM market.v_aelc_features_1s_v1
 WHERE edge_score >= %s
 """
 
 UPSERT_SQL = """
-INSERT INTO market.edge_signals_v1 (symbol_id, bucket_ts, edge_score, instrument_symbol)
+INSERT INTO market.edge_signals_v1 (
+    symbol_id, instrument_symbol, bucket_ts,
+    edge_label, edge_score, edge_direction,
+    is_flow_dominant, is_exhausted, is_toxic_entry, is_high_confidence,
+    net_flow, net_flow_z, ofi_normalised, ofi_z, toxicity_ratio,
+    flow_momentum, momentum_direction, persistence_seconds,
+    flow_direction, trade_count, total_vol, vwap, mid_price
+)
 VALUES %s
 ON CONFLICT (symbol_id, bucket_ts) DO UPDATE SET
+    instrument_symbol  = EXCLUDED.instrument_symbol,
+    edge_label         = EXCLUDED.edge_label,
     edge_score         = EXCLUDED.edge_score,
-    instrument_symbol  = EXCLUDED.instrument_symbol
+    edge_direction     = EXCLUDED.edge_direction,
+    is_flow_dominant   = EXCLUDED.is_flow_dominant,
+    is_exhausted       = EXCLUDED.is_exhausted,
+    is_toxic_entry     = EXCLUDED.is_toxic_entry,
+    is_high_confidence = EXCLUDED.is_high_confidence,
+    net_flow           = EXCLUDED.net_flow,
+    net_flow_z         = EXCLUDED.net_flow_z,
+    ofi_normalised     = EXCLUDED.ofi_normalised,
+    ofi_z              = EXCLUDED.ofi_z,
+    toxicity_ratio     = EXCLUDED.toxicity_ratio,
+    flow_momentum      = EXCLUDED.flow_momentum,
+    momentum_direction = EXCLUDED.momentum_direction,
+    persistence_seconds = EXCLUDED.persistence_seconds,
+    flow_direction     = EXCLUDED.flow_direction,
+    trade_count        = EXCLUDED.trade_count,
+    total_vol          = EXCLUDED.total_vol,
+    vwap               = EXCLUDED.vwap,
+    mid_price          = EXCLUDED.mid_price
 """
 
 # ── Lifecycle ─────────────────────────────────────────────────────────────────
@@ -99,9 +131,28 @@ def run_cycle(conn) -> int:
     values = [
         (
             r["symbol_id"],
-            r["bucket_ts"],
-            r["edge_score"],
             r["instrument_symbol"] or str(r["symbol_id"]),
+            r["bucket_ts"],
+            r["edge_label"],
+            r["edge_score"],
+            r["edge_direction"],
+            r["is_flow_dominant"],
+            r["is_exhausted"],
+            r["is_toxic_entry"],
+            r["is_high_confidence"],
+            r["net_flow"],
+            r["net_flow_z"],
+            r["ofi_normalised"],
+            r["ofi_z"],
+            r["toxicity_ratio"],
+            r["flow_momentum"],
+            r["momentum_direction"],
+            r["persistence_seconds"],
+            r["flow_direction"],
+            r["trade_count"],
+            r["total_vol"],
+            r["vwap"],
+            r["mid_price"],
         )
         for r in rows
     ]
