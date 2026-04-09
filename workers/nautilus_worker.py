@@ -1,16 +1,19 @@
 """
-nautilus_worker.py  —  v2
+nautilus_worker.py  —  v3
 ==========================
 NautilusTrader execution adapter for Noterminal / TruthEngine.
+Rewritten to use alpaca-py directly (NT Alpaca adapter removed in 1.222+).
 
-Architecture (ChatGPT + Claude synthesis):
+Architecture:
   Supabase = durable command / audit plane
-  NT       = live execution state machine
+  alpaca-py = live execution (paper or live)
+  NautilusTrader = NOT used for execution in this version
+                   (adapter removed upstream; using alpaca-py directly)
 
 Boot sequence:
   1. Hydrate active instruments from intel.instrument_registry_v1
-  2. Ensure NT cache has instrument definitions
-  3. Reconcile positions from venue → NT cache → Supabase snapshot
+  2. Connect to Alpaca via alpaca-py
+  3. Reconcile open positions
   4. Start signal ingress loop (poll dispatch_queue_v1 w/ SKIP LOCKED)
   5. Periodic reconciler every 60s
 
@@ -19,7 +22,7 @@ Signal ingress:
   intel.dispatch_queue_v1               <- atomic work queue (SKIP LOCKED)
   intel.pending_execution_v1            <- deferred closed-market equity orders
 
-Fill/reject callbacks write to:
+Fill callbacks write to:
   intel.execution_fill_v1
   intel.position_snapshots_v1
   intel.reconciliation_audit_v1
@@ -31,8 +34,8 @@ Env vars (set in Render dashboard):
   ALPACA_PAPER            true | false  (default true)
   POLL_INTERVAL_S         seconds between queue polls (default 5)
   DEFAULT_NOTIONAL_USD    per-order notional cap (default 500)
-  TRADER_ID               NT trader identifier (default NOTERMINAL-001)
-  WORKER_INSTANCE         unique name for this Render instance (default NT-WORKER-1)
+  TRADER_ID               identifier string (default NOTERMINAL-001)
+  WORKER_INSTANCE         unique name for this instance (default NT-WORKER-1)
 """
 
 import asyncio
@@ -43,20 +46,9 @@ from datetime import datetime, time, timedelta, timezone
 from decimal import Decimal
 
 import asyncpg
-from nautilus_trader.adapters.alpaca.config import AlpacaDataClientConfig, AlpacaExecClientConfig
-from nautilus_trader.adapters.alpaca.factories import (
-    AlpacaLiveDataClientFactory,
-    AlpacaLiveExecClientFactory,
-)
-from nautilus_trader.config import LiveExecEngineConfig, TradingNodeConfig
-from nautilus_trader.core.uuid import UUID4
-from nautilus_trader.live.node import TradingNode
-from nautilus_trader.model.enums import OrderSide, TimeInForce
-from nautilus_trader.model.identifiers import InstrumentId, Symbol, TraderId, Venue
-from nautilus_trader.model.objects import Quantity
-from nautilus_trader.model.orders import MarketOrder
-from nautilus_trader.trading.strategy import Strategy
-from nautilus_trader.config import StrategyConfig
+from alpaca.trading.client import TradingClient
+from alpaca.trading.requests import MarketOrderRequest
+from alpaca.trading.enums import OrderSide, TimeInForce
 
 # ── Logging ─────────────────────────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -80,12 +72,6 @@ INSTRUMENT_REFRESH_S = 30
 # NYSE regular session (UTC)
 NYSE_OPEN_UTC  = time(13, 30)
 NYSE_CLOSE_UTC = time(20, 0)
-
-ASSET_CLASS_VENUE = {
-    "CRYPTO": Venue("ALPACA"),
-    "FOREX":  Venue("ALPACA"),
-    "EQUITY": Venue("ALPACA"),
-}
 
 
 # ── Session helpers ─────────────────────────────────────────────────────────────────────────────
@@ -167,7 +153,7 @@ INSERT_POSITION_SNAPSHOT_SQL = """
 INSERT INTO intel.position_snapshots_v1 (
     instrument_symbol, venue, net_qty, avg_open_price,
     unrealized_pnl_usd, realized_pnl_usd, source_of_truth, worker_instance, meta
-) VALUES ($1,$2,$3,$4,$5,$6,'NT_CACHE',$7,$8);
+) VALUES ($1,$2,$3,$4,$5,$6,'ALPACA_DIRECT',$7,$8);
 """
 
 INSERT_RECONCILIATION_AUDIT_SQL = """
@@ -196,125 +182,144 @@ class InstrumentUniverse:
             self._registry[sym] = dict(row)
         return new
 
-    def instrument_id(self, symbol: str) -> InstrumentId | None:
-        row = self._registry.get(symbol)
-        if not row:
-            return None
-        asset_class = row.get("asset_class") or "EQUITY"
-        venue = ASSET_CLASS_VENUE.get(asset_class, Venue("ALPACA"))
-        return InstrumentId(Symbol(symbol), venue)
-
     def lot_size(self, symbol: str) -> float:
         row = self._registry.get(symbol)
         return float(row["lot_size"]) if row and row.get("lot_size") else 1.0
+
+    def venue_symbol(self, symbol: str) -> str:
+        """Return venue-specific symbol if mapped, else canonical."""
+        row = self._registry.get(symbol)
+        if row and row.get("venue_symbol"):
+            return row["venue_symbol"]
+        return symbol
 
 
 universe = InstrumentUniverse()
 
 
-# ── Order sizing ───────────────────────────────────────────────────────────────────────────────
-def estimate_quantity(symbol: str, notional_usd: Decimal, mid_price) -> Quantity:
+# ── Order sizing ──────────────────────────────────────────────────────────────────────────────
+def estimate_quantity(symbol: str, notional_usd: Decimal, mid_price) -> float:
     lot = universe.lot_size(symbol)
     if mid_price and Decimal(str(mid_price)) > 0:
         raw = notional_usd / Decimal(str(mid_price))
     else:
         raw = Decimal(str(lot))
     lots = max(1, int(raw / Decimal(str(lot))))
-    return Quantity(lots * lot, precision=8)
+    return float(lots * lot)
 
 
-# ── NT Strategy ────────────────────────────────────────────────────────────────────────────────
-class NoterminalStrategyConfig(StrategyConfig, frozen=True):
-    strategy_id: str = "NOTERMINAL_GATE_v2"
-
-
-class NoterminalStrategy(Strategy):
-    def __init__(self, config: NoterminalStrategyConfig, db_pool: asyncpg.Pool):
-        super().__init__(config)
-        self._db = db_pool
-        self._pending: dict[str, dict] = {}
-
-    def register_pending(self, coid: str, meta: dict) -> None:
-        self._pending[coid] = meta
-
-    def on_order_filled(self, event) -> None:
-        coid = str(event.client_order_id)
-        meta = self._pending.pop(coid, {})
-        asyncio.get_event_loop().create_task(self._persist_fill(coid, event, meta))
-
-    async def _persist_fill(self, coid: str, event, meta: dict) -> None:
-        fill_id          = uuid.uuid4()
-        execution_run_id = uuid.uuid4()
-        fill_price       = float(event.last_px)  if event.last_px  else None
-        fill_size        = float(event.last_qty) if event.last_qty else None
-        notional         = (fill_price * fill_size) if (fill_price and fill_size) else None
-        fill_ts          = datetime.fromtimestamp(event.ts_event / 1e9, tz=timezone.utc)
-        try:
-            async with self._db.acquire() as conn:
-                await conn.execute(
-                    INSERT_FILL_SQL,
-                    fill_id, execution_run_id,
-                    meta.get("instrument_symbol"),
-                    fill_price, fill_size, notional,
-                    fill_ts, "NAUTILUS_LIVE",
-                    meta.get("venue", "ALPACA"), coid,
-                )
-                await conn.execute(MARK_FILLED_SQL, coid)
-            log.info(f"Fill persisted — {meta.get('instrument_symbol')} @ {fill_price}×{fill_size}")
-        except Exception as e:
-            log.error(f"Fill persist failed {coid}: {e}")
-
-    def on_order_rejected(self, event) -> None:
-        coid   = str(event.client_order_id)
-        reason = str(event.reason) if hasattr(event, "reason") else "REJECTED"
-        meta   = self._pending.pop(coid, {})
-        log.warning(f"Order rejected — {coid} | {reason}")
-        asyncio.get_event_loop().create_task(
-            self._handle_rejection(meta.get("queue_id"), reason)
-        )
-
-    async def _handle_rejection(self, queue_id, reason: str) -> None:
-        if queue_id is None:
-            return
-        try:
-            async with self._db.acquire() as conn:
-                await conn.execute(MARK_ERROR_SQL, reason, queue_id)
-        except Exception as e:
-            log.error(f"Rejection mark failed: {e}")
-
-
-# ── Reconciler ───────────────────────────────────────────────────────────────────────────────
-async def run_reconciler(db_pool: asyncpg.Pool, node: TradingNode) -> None:
+# ── Alpaca order submission ─────────────────────────────────────────────────────────────────────
+async def submit_alpaca_order(
+    client: TradingClient,
+    symbol: str,
+    side: OrderSide,
+    qty: float,
+    client_order_id: str,
+) -> dict | None:
+    """Submit a market IOC order via alpaca-py. Returns order dict or None."""
     try:
-        nt_positions = {
-            str(p.instrument_id.symbol): float(p.net_qty)
-            for p in node.cache.positions()
-        }
+        req = MarketOrderRequest(
+            symbol=symbol,
+            qty=qty,
+            side=side,
+            time_in_force=TimeInForce.IOC,
+            client_order_id=client_order_id,
+        )
+        order = client.submit_order(req)
+        return order
+    except Exception as e:
+        log.error(f"Alpaca order submission failed for {symbol}: {e}")
+        return None
+
+
+# ── Reconciler ──────────────────────────────────────────────────────────────────────────────
+async def run_reconciler(
+    db_pool: asyncpg.Pool,
+    alpaca_client: TradingClient,
+) -> None:
+    try:
+        positions = alpaca_client.get_all_positions()
         async with db_pool.acquire() as conn:
-            for sym, nt_qty in nt_positions.items():
-                drift_flag = False
-                resolution = "WITHIN_TOLERANCE"
+            for pos in positions:
+                symbol   = str(pos.symbol)
+                net_qty  = float(pos.qty)
+                avg_px   = float(pos.avg_entry_price) if pos.avg_entry_price else None
+                unreal   = float(pos.unrealized_pl) if pos.unrealized_pl else None
+
                 await conn.execute(
                     INSERT_RECONCILIATION_AUDIT_SQL,
-                    sym, nt_qty, None, drift_flag, 0.0, resolution, WORKER_INSTANCE,
+                    symbol, net_qty, None, False, 0.0, "WITHIN_TOLERANCE", WORKER_INSTANCE,
                 )
-                pos = next((p for p in node.cache.positions()
-                            if str(p.instrument_id.symbol) == sym), None)
                 await conn.execute(
                     INSERT_POSITION_SNAPSHOT_SQL,
-                    sym, "ALPACA", nt_qty,
-                    float(pos.avg_px_open)    if pos and pos.avg_px_open    else None,
-                    float(pos.unrealized_pnl) if pos and pos.unrealized_pnl else None,
-                    float(pos.realized_pnl)   if pos and pos.realized_pnl   else None,
+                    symbol, "ALPACA", net_qty, avg_px, unreal, None,
                     WORKER_INSTANCE, None,
                 )
-        log.info(f"Reconciler — {len(nt_positions)} position(s) snapshotted.")
+        log.info(f"Reconciler — {len(positions)} position(s) snapshotted from Alpaca.")
     except Exception as e:
         log.error(f"Reconciler error: {e}", exc_info=True)
 
 
-# ── Ingress loop ──────────────────────────────────────────────────────────────────────────────
-async def ingress_loop(db_pool: asyncpg.Pool, strategy: NoterminalStrategy, node: TradingNode) -> None:
+# ── Fill poller ──────────────────────────────────────────────────────────────────────────────
+async def poll_fill(
+    db_pool: asyncpg.Pool,
+    alpaca_client: TradingClient,
+    client_order_id: str,
+    queue_id,
+    instrument_symbol: str,
+    venue_str: str,
+) -> None:
+    """
+    Poll Alpaca for fill status up to 10 times with 1s delay.
+    Writes fill to execution_fill_v1 if filled.
+    """
+    for attempt in range(10):
+        await asyncio.sleep(1)
+        try:
+            order = alpaca_client.get_order_by_client_id(client_order_id)
+            status = str(order.status).lower()
+
+            if status in ("filled", "partially_filled"):
+                fill_id          = uuid.uuid4()
+                execution_run_id = uuid.uuid4()
+                fill_price = float(order.filled_avg_price) if order.filled_avg_price else None
+                fill_size  = float(order.filled_qty)       if order.filled_qty        else None
+                notional   = (fill_price * fill_size) if (fill_price and fill_size) else None
+                fill_ts    = order.filled_at or datetime.now(timezone.utc)
+                if hasattr(fill_ts, 'isoformat'):
+                    fill_ts = fill_ts if fill_ts.tzinfo else fill_ts.replace(tzinfo=timezone.utc)
+
+                async with db_pool.acquire() as conn:
+                    await conn.execute(
+                        INSERT_FILL_SQL,
+                        fill_id, execution_run_id, instrument_symbol,
+                        fill_price, fill_size, notional,
+                        fill_ts, "ALPACA_DIRECT", venue_str, client_order_id,
+                    )
+                    await conn.execute(MARK_FILLED_SQL, client_order_id)
+                log.info(f"Fill captured — {instrument_symbol} @ {fill_price}×{fill_size}")
+                return
+
+            elif status in ("canceled", "expired", "rejected"):
+                async with db_pool.acquire() as conn:
+                    await conn.execute(MARK_ERROR_SQL, f"ORDER_{status.upper()}", queue_id)
+                log.warning(f"Order {client_order_id} terminal status: {status}")
+                return
+
+        except Exception as e:
+            log.warning(f"Fill poll attempt {attempt+1} failed for {client_order_id}: {e}")
+
+    # Timed out waiting for fill
+    async with db_pool.acquire() as conn:
+        await conn.execute(MARK_ERROR_SQL, "FILL_POLL_TIMEOUT", queue_id)
+    log.warning(f"Fill poll timeout — {client_order_id}")
+
+
+# ── Ingress loop ─────────────────────────────────────────────────────────────────────────────
+async def ingress_loop(
+    db_pool: asyncpg.Pool,
+    alpaca_client: TradingClient,
+) -> None:
     last_reconcile     = 0.0
     last_instr_refresh = 0.0
 
@@ -328,7 +333,7 @@ async def ingress_loop(db_pool: asyncpg.Pool, strategy: NoterminalStrategy, node
             last_instr_refresh = now
 
         if now - last_reconcile > RECONCILE_INTERVAL_S:
-            await run_reconciler(db_pool, node)
+            await run_reconciler(db_pool, alpaca_client)
             last_reconcile = now
 
         try:
@@ -361,6 +366,7 @@ async def ingress_loop(db_pool: asyncpg.Pool, strategy: NoterminalStrategy, node
                 asset_class = row.get("asset_class") or "EQUITY"
                 venue_str   = (row.get("venue") or "ALPACA").upper()
 
+                # Session gate
                 if not session_policy_allows(session_pol):
                     log.info(f"Market closed — deferring {symbol} to pending_execution_v1")
                     next_open = next_session_open_utc()
@@ -375,44 +381,27 @@ async def ingress_loop(db_pool: asyncpg.Pool, strategy: NoterminalStrategy, node
                         await conn.execute(MARK_ERROR_SQL, "DEFERRED_MARKET_CLOSED", queue_id)
                     continue
 
-                instrument_id = universe.instrument_id(symbol)
-                if not instrument_id:
-                    log.warning(f"{symbol} not in instrument registry — skipping")
-                    async with db_pool.acquire() as conn:
-                        await conn.execute(MARK_ERROR_SQL, "SYMBOL_NOT_IN_REGISTRY", queue_id)
-                    continue
-
-                instrument = node.cache.instrument(instrument_id)
-                if not instrument:
-                    log.warning(f"{instrument_id} not in NT cache — skipping")
-                    async with db_pool.acquire() as conn:
-                        await conn.execute(MARK_ERROR_SQL, "INSTRUMENT_NOT_IN_CACHE", queue_id)
-                    continue
-
-                side  = OrderSide.BUY if direction == 1 else OrderSide.SELL
-                qty   = estimate_quantity(symbol, DEFAULT_NOTIONAL_USD, mid_price)
-                order = MarketOrder(
-                    trader_id=TraderId(TRADER_ID),
-                    strategy_id=strategy.id,
-                    instrument_id=instrument_id,
-                    client_order_id=coid,
-                    order_side=side,
-                    quantity=qty,
-                    time_in_force=TimeInForce.IOC,
-                    init_id=UUID4(),
-                    ts_init=node.clock.timestamp_ns(),
-                )
-
-                strategy.register_pending(coid, {
-                    "signal_id": signal_id, "queue_id": queue_id,
-                    "instrument_symbol": symbol, "venue": venue_str, "asset_class": asset_class,
-                })
+                # Size and submit
+                venue_sym = universe.venue_symbol(symbol)
+                side      = OrderSide.BUY if direction == 1 else OrderSide.SELL
+                qty       = estimate_quantity(symbol, DEFAULT_NOTIONAL_USD, mid_price)
 
                 async with db_pool.acquire() as conn:
                     await conn.execute(MARK_SUBMITTED_SQL, queue_id)
 
-                strategy.submit_order(order)
-                log.info(f"Submitted {side.name} {qty} {instrument_id} | coid={coid}")
+                order = await submit_alpaca_order(alpaca_client, venue_sym, side, qty, coid)
+
+                if order is None:
+                    async with db_pool.acquire() as conn:
+                        await conn.execute(MARK_ERROR_SQL, "SUBMISSION_FAILED", queue_id)
+                    continue
+
+                log.info(f"Submitted {side.value} {qty} {venue_sym} | coid={coid}")
+
+                # Poll for fill asynchronously
+                asyncio.create_task(
+                    poll_fill(db_pool, alpaca_client, coid, queue_id, symbol, venue_str)
+                )
 
         except Exception as e:
             log.error(f"Ingress loop error: {e}", exc_info=True)
@@ -420,9 +409,9 @@ async def ingress_loop(db_pool: asyncpg.Pool, strategy: NoterminalStrategy, node
         await asyncio.sleep(POLL_INTERVAL_S)
 
 
-# ── Entry point ───────────────────────────────────────────────────────────────────────────────
+# ── Entry point ──────────────────────────────────────────────────────────────────────────────
 async def main() -> None:
-    log.info(f"nautilus_worker v2 starting — instance={WORKER_INSTANCE}")
+    log.info(f"nautilus_worker v3 starting — instance={WORKER_INSTANCE}")
 
     db_pool = await asyncpg.create_pool(
         dsn=SUPABASE_DB_URL, min_size=2, max_size=6, command_timeout=15,
@@ -432,36 +421,24 @@ async def main() -> None:
     new_symbols = await universe.refresh(db_pool)
     log.info(f"Instrument universe loaded — {len(new_symbols)} symbol(s).")
 
-    config = TradingNodeConfig(
-        trader_id=TRADER_ID,
-        data_clients={"ALPACA": AlpacaDataClientConfig(
-            api_key=ALPACA_API_KEY, api_secret=ALPACA_API_SECRET, paper=ALPACA_PAPER,
-        )},
-        exec_clients={"ALPACA": AlpacaExecClientConfig(
-            api_key=ALPACA_API_KEY, api_secret=ALPACA_API_SECRET, paper=ALPACA_PAPER,
-        )},
-        exec_engine=LiveExecEngineConfig(reconciliation=True),
+    alpaca_client = TradingClient(
+        api_key=ALPACA_API_KEY,
+        secret_key=ALPACA_API_SECRET,
+        paper=ALPACA_PAPER,
     )
-
-    node = TradingNode(config=config)
-    node.add_data_client_factory("ALPACA", AlpacaLiveDataClientFactory)
-    node.add_exec_client_factory("ALPACA", AlpacaLiveExecClientFactory)
-    node.build()
-
-    strategy = NoterminalStrategy(
-        config=NoterminalStrategyConfig(strategy_id="NOTERMINAL_GATE_v2"),
-        db_pool=db_pool,
-    )
-    node.trader.add_strategy(strategy)
-    node.start()
-    log.info("NautilusTrader node started.")
+    log.info(f"Alpaca client connected — paper={ALPACA_PAPER}")
 
     try:
-        await ingress_loop(db_pool, strategy, node)
+        account = alpaca_client.get_account()
+        log.info(f"Alpaca account status: {account.status} | equity: {account.equity}")
+    except Exception as e:
+        log.error(f"Alpaca account check failed: {e}")
+
+    try:
+        await ingress_loop(db_pool, alpaca_client)
     except asyncio.CancelledError:
         log.info("Shutdown received.")
     finally:
-        node.stop()
         await db_pool.close()
         log.info("nautilus_worker stopped cleanly.")
 
@@ -469,15 +446,12 @@ async def main() -> None:
 async def dry_run() -> None:
     import sys
     log.info("=== DRY RUN MODE — no orders will be submitted ===")
-    errors = []
 
     required_env = ["SUPABASE_DB_URL", "ALPACA_API_KEY", "ALPACA_API_SECRET"]
-    for var in required_env:
-        if not os.environ.get(var):
-            errors.append(f"Missing required env var: {var}")
+    errors = [v for v in required_env if not os.environ.get(v)]
     if errors:
         for e in errors:
-            log.error(e)
+            log.error(f"Missing required env var: {e}")
         sys.exit(1)
     log.info("✓ Required env vars present.")
 
@@ -492,7 +466,7 @@ async def dry_run() -> None:
 
     try:
         new_symbols = await universe.refresh(db_pool)
-        log.info(f"✓ Instrument registry loaded — {len(new_symbols)} active symbol(s): {new_symbols}")
+        log.info(f"✓ Instrument registry loaded — {len(new_symbols)} symbol(s).")
     except Exception as e:
         log.error(f"✗ Instrument registry load failed: {e}")
         await db_pool.close()
@@ -510,10 +484,15 @@ async def dry_run() -> None:
         sys.exit(1)
 
     try:
-        from nautilus_trader.live.node import TradingNode  # noqa: F401
-        log.info("✓ nautilus_trader import verified.")
-    except ImportError as e:
-        log.error(f"✗ nautilus_trader import failed: {e}")
+        alpaca_client = TradingClient(
+            api_key=ALPACA_API_KEY,
+            secret_key=ALPACA_API_SECRET,
+            paper=ALPACA_PAPER,
+        )
+        account = alpaca_client.get_account()
+        log.info(f"✓ Alpaca connected — status={account.status} equity={account.equity}")
+    except Exception as e:
+        log.error(f"✗ Alpaca connection failed: {e}")
         await db_pool.close()
         sys.exit(1)
 
