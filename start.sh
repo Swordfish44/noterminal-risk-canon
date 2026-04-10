@@ -8,6 +8,14 @@ set -euo pipefail
 (while true; do python workers/micro_features_worker.py; echo "micro_features exited $? — restarting"; sleep 5; done) &
 (while true; do python edge_signals_worker.py;         echo "edge_signals exited $? — restarting";   sleep 5; done) &
 (while true; do python workers/nautilus_worker.py; echo "nautilus_worker exited $? — restarting"; sleep 5; done) &
+(
+  while true; do
+    echo "[control_plane] starting..."
+    python workers/control_plane_worker.py
+    echo "[control_plane] crashed. restarting in 2s..."
+    sleep 2
+  done
+) &
 
 # Critical worker — exit triggers Render restart of the whole service.
 python workers/ops_worker.py
