@@ -11,14 +11,14 @@ from dotenv import load_dotenv
 # ============================================================
 # LOAD .env FROM PROJECT ROOT
 # ============================================================
-load_dotenv(Path(__file__).resolve().parents[1] / ".env")
+load_dotenv(Path(__file__).resolve().parents[1] / ".env", override=False)
 
-PG_CONN = os.getenv("PG_CONN")
+SUPABASE_DB_URL = os.getenv("SUPABASE_DB_URL")
 
 print("RUNNING FILE:", __file__, flush=True)
 
-if not PG_CONN:
-    raise RuntimeError("PG_CONN missing from .env")
+if not SUPABASE_DB_URL:
+    raise RuntimeError("SUPABASE_DB_URL missing from environment")
 
 # ============================================================
 # CONFIG
@@ -54,7 +54,7 @@ class ControlPlaneWorker:
     async def connect_db(self):
         print("Connecting to DB...", flush=True)
         self.pool = await asyncpg.create_pool(
-            dsn=PG_CONN,
+            dsn=SUPABASE_DB_URL,
             min_size=1,
             max_size=3,
             statement_cache_size=0,
