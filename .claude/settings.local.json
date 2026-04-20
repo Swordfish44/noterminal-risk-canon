@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(docker rm:*)",
+      "Bash(docker-compose up:*)",
+      "Bash(MSYS_NO_PATHCONV=1 docker exec hummingbot:*)"
+    ]
+  }
+}

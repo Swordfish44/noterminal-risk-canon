@@ -1,0 +1,176 @@
+Traceback (most recent call last):
+  File "/home/hummingbot/./bin/hummingbot_quickstart.py", line 288, in <module>
+    main()
+    ~~~~^^
+  File "/home/hummingbot/./bin/hummingbot_quickstart.py", line 270, in main
+    client_config_map = load_client_config_map_from_file()
+  File "/home/hummingbot/hummingbot/client/config/config_helpers.py", line 654, in load_client_config_map_from_file
+    client_config = ClientConfigMap(**config_data)
+  File "/opt/conda/envs/hummingbot/lib/python3.13/site-packages/pydantic/main.py", line 250, in __init__
+    validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+pydantic_core._pydantic_core.ValidationError: 4 validation errors for client_config_map
+paper_trade_enabled
+  Extra inputs are not permitted [type=extra_forbidden, input_value=True, input_type=bool]
+    For further information visit https://errors.pydantic.dev/2.12/v/extra_forbidden
+paper_trade_account_balance
+  Extra inputs are not permitted [type=extra_forbidden, input_value={'BTC': 1.0, 'ETH': 10.0,...0000.0, 'USDC': 10000.0}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.12/v/extra_forbidden
+script_enabled
+  Extra inputs are not permitted [type=extra_forbidden, input_value=True, input_type=bool]
+    For further information visit https://errors.pydantic.dev/2.12/v/extra_forbidden
+script_file_path
+  Extra inputs are not permitted [type=extra_forbidden, input_value='/home/hummingbot/scripts/truth_engine_paper.py', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.12/v/extra_forbidden
+Traceback (most recent call last):
+  File "/home/hummingbot/./bin/hummingbot_quickstart.py", line 288, in <module>
+    main()
+    ~~~~^^
+  File "/home/hummingbot/./bin/hummingbot_quickstart.py", line 270, in main
+    client_config_map = load_client_config_map_from_file()
+  File "/home/hummingbot/hummingbot/client/config/config_helpers.py", line 654, in load_client_config_map_from_file
+    client_config = ClientConfigMap(**config_data)
+  File "/opt/conda/envs/hummingbot/lib/python3.13/site-packages/pydantic/main.py", line 250, in __init__
+    validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+pydantic_core._pydantic_core.ValidationError: 4 validation errors for client_config_map
+paper_trade_enabled
+  Extra inputs are not permitted [type=extra_forbidden, input_value=True, input_type=bool]
+    For further information visit https://errors.pydantic.dev/2.12/v/extra_forbidden
+paper_trade_account_balance
+  Extra inputs are not permitted [type=extra_forbidden, input_value={'BTC': 1.0, 'ETH': 10.0,...0000.0, 'USDC': 10000.0}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.12/v/extra_forbidden
+script_enabled
+  Extra inputs are not permitted [type=extra_forbidden, input_value=True, input_type=bool]
+    For further information visit https://errors.pydantic.dev/2.12/v/extra_forbidden
+script_file_path
+  Extra inputs are not permitted [type=extra_forbidden, input_value='/home/hummingbot/scripts/truth_engine_paper.py', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.12/v/extra_forbidden
+Traceback (most recent call last):
+  File "/home/hummingbot/./bin/hummingbot_quickstart.py", line 288, in <module>
+    main()
+    ~~~~^^
+  File "/home/hummingbot/./bin/hummingbot_quickstart.py", line 270, in main
+    client_config_map = load_client_config_map_from_file()
+  File "/home/hummingbot/hummingbot/client/config/config_helpers.py", line 654, in load_client_config_map_from_file
+    client_config = ClientConfigMap(**config_data)
+  File "/opt/conda/envs/hummingbot/lib/python3.13/site-packages/pydantic/main.py", line 250, in __init__
+    validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+pydantic_core._pydantic_core.ValidationError: 4 validation errors for client_config_map
+paper_trade_enabled
+  Extra inputs are not permitted [type=extra_forbidden, input_value=True, input_type=bool]
+    For further information visit https://errors.pydantic.dev/2.12/v/extra_forbidden
+paper_trade_account_balance
+  Extra inputs are not permitted [type=extra_forbidden, input_value={'BTC': 1.0, 'ETH': 10.0,...0000.0, 'USDC': 10000.0}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.12/v/extra_forbidden
+script_enabled
+  Extra inputs are not permitted [type=extra_forbidden, input_value=True, input_type=bool]
+    For further information visit https://errors.pydantic.dev/2.12/v/extra_forbidden
+script_file_path
+  Extra inputs are not permitted [type=extra_forbidden, input_value='/home/hummingbot/scripts/truth_engine_paper.py', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.12/v/extra_forbidden
+Traceback (most recent call last):
+  File "/home/hummingbot/./bin/hummingbot_quickstart.py", line 288, in <module>
+    main()
+    ~~~~^^
+  File "/home/hummingbot/./bin/hummingbot_quickstart.py", line 270, in main
+    client_config_map = load_client_config_map_from_file()
+  File "/home/hummingbot/hummingbot/client/config/config_helpers.py", line 654, in load_client_config_map_from_file
+    client_config = ClientConfigMap(**config_data)
+  File "/opt/conda/envs/hummingbot/lib/python3.13/site-packages/pydantic/main.py", line 250, in __init__
+    validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+pydantic_core._pydantic_core.ValidationError: 4 validation errors for client_config_map
+paper_trade_enabled
+  Extra inputs are not permitted [type=extra_forbidden, input_value=True, input_type=bool]
+    For further information visit https://errors.pydantic.dev/2.12/v/extra_forbidden
+paper_trade_account_balance
+  Extra inputs are not permitted [type=extra_forbidden, input_value={'BTC': 1.0, 'ETH': 10.0,...0000.0, 'USDC': 10000.0}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.12/v/extra_forbidden
+script_enabled
+  Extra inputs are not permitted [type=extra_forbidden, input_value=True, input_type=bool]
+    For further information visit https://errors.pydantic.dev/2.12/v/extra_forbidden
+script_file_path
+  Extra inputs are not permitted [type=extra_forbidden, input_value='/home/hummingbot/scripts/truth_engine_paper.py', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.12/v/extra_forbidden
+Traceback (most recent call last):
+  File "/home/hummingbot/./bin/hummingbot_quickstart.py", line 288, in <module>
+    main()
+    ~~~~^^
+  File "/home/hummingbot/./bin/hummingbot_quickstart.py", line 284, in main
+    ev_loop.run_until_complete(quick_start(args, secrets_manager))
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/conda/envs/hummingbot/lib/python3.13/asyncio/base_events.py", line 725, in run_until_complete
+    return future.result()
+           ~~~~~~~~~~~~~^^
+  File "/home/hummingbot/./bin/hummingbot_quickstart.py", line 93, in quick_start
+    if not Security.login(secrets_manager):
+           ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/home/hummingbot/hummingbot/client/config/security.py", line 53, in login
+    if not validate_password(secrets_manager):
+           ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/home/hummingbot/hummingbot/client/config/config_crypt.py", line 71, in validate_password
+    with open(PASSWORD_VERIFICATION_PATH, "r") as f:
+         ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/home/hummingbot/conf/.password_verification'
+Traceback (most recent call last):
+  File "/home/hummingbot/./bin/hummingbot_quickstart.py", line 288, in <module>
+    main()
+    ~~~~^^
+  File "/home/hummingbot/./bin/hummingbot_quickstart.py", line 284, in main
+    ev_loop.run_until_complete(quick_start(args, secrets_manager))
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/conda/envs/hummingbot/lib/python3.13/asyncio/base_events.py", line 725, in run_until_complete
+    return future.result()
+           ~~~~~~~~~~~~~^^
+  File "/home/hummingbot/./bin/hummingbot_quickstart.py", line 93, in quick_start
+    if not Security.login(secrets_manager):
+           ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/home/hummingbot/hummingbot/client/config/security.py", line 53, in login
+    if not validate_password(secrets_manager):
+           ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/home/hummingbot/hummingbot/client/config/config_crypt.py", line 71, in validate_password
+    with open(PASSWORD_VERIFICATION_PATH, "r") as f:
+         ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/home/hummingbot/conf/.password_verification'
+Traceback (most recent call last):
+  File "/home/hummingbot/./bin/hummingbot_quickstart.py", line 288, in <module>
+    main()
+    ~~~~^^
+  File "/home/hummingbot/./bin/hummingbot_quickstart.py", line 284, in main
+    ev_loop.run_until_complete(quick_start(args, secrets_manager))
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/conda/envs/hummingbot/lib/python3.13/asyncio/base_events.py", line 725, in run_until_complete
+    return future.result()
+           ~~~~~~~~~~~~~^^
+  File "/home/hummingbot/./bin/hummingbot_quickstart.py", line 93, in quick_start
+    if not Security.login(secrets_manager):
+           ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/home/hummingbot/hummingbot/client/config/security.py", line 56, in login
+    cls.decrypt_all()
+    ~~~~~~~~~~~~~~~^^
+  File "/home/hummingbot/hummingbot/client/config/security.py", line 65, in decrypt_all
+    encrypted_files = list_connector_configs()
+  File "/home/hummingbot/hummingbot/client/config/config_helpers.py", line 704, in list_connector_configs
+    Path(f.path) for f in scandir(str(CONNECTORS_CONF_DIR_PATH))
+                          ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/home/hummingbot/conf/connectors'
+Traceback (most recent call last):
+  File "/home/hummingbot/./bin/hummingbot_quickstart.py", line 288, in <module>
+    main()
+    ~~~~^^
+  File "/home/hummingbot/./bin/hummingbot_quickstart.py", line 284, in main
+    ev_loop.run_until_complete(quick_start(args, secrets_manager))
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/conda/envs/hummingbot/lib/python3.13/asyncio/base_events.py", line 725, in run_until_complete
+    return future.result()
+           ~~~~~~~~~~~~~^^
+  File "/home/hummingbot/./bin/hummingbot_quickstart.py", line 93, in quick_start
+    if not Security.login(secrets_manager):
+           ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/home/hummingbot/hummingbot/client/config/security.py", line 56, in login
+    cls.decrypt_all()
+    ~~~~~~~~~~~~~~~^^
+  File "/home/hummingbot/hummingbot/client/config/security.py", line 65, in decrypt_all
+    encrypted_files = list_connector_configs()
+  File "/home/hummingbot/hummingbot/client/config/config_helpers.py", line 704, in list_connector_configs
+    Path(f.path) for f in scandir(str(CONNECTORS_CONF_DIR_PATH))
+                          ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/home/hummingbot/conf/connectors'

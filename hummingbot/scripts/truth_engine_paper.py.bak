@@ -1,0 +1,166 @@
+"""
+truth_engine_paper.py — Hummingbot paper trading script
+
+Polls market.edge_signals_v1 in Supabase every POLL_INTERVAL_S seconds.
+Converts edge signals → paper orders on binance_paper_trade.
+
+Env (injected via docker-compose):
+  DATABASE_URL — Supabase Postgres connection string
+  EDGE_THRESHOLD — minimum edge_score to act on (default 3)
+  POLL_INTERVAL_S — polling cadence in seconds (default 10)
+  ORDER_AMOUNT_USD — notional per order (default 100)
+"""
+
+import os
+import time
+import logging
+from decimal import Decimal
+from typing import Dict, List, Optional
+
+import psycopg2
+import psycopg2.extras
+from hummingbot.strategy.strategy_v2_base import StrategyV2Base, StrategyV2ConfigBase
+from hummingbot.core.data_type.common import OrderType, TradeType
+
+log = logging.getLogger(__name__)
+
+# ── Config ────────────────────────────────────────────────────────────────────
+
+DB_URL            = os.environ.get("DATABASE_URL", "")
+EDGE_THRESHOLD    = int(os.environ.get("EDGE_THRESHOLD", "3"))
+POLL_INTERVAL_S   = float(os.environ.get("POLL_INTERVAL_S", "10"))
+ORDER_AMOUNT_USD  = Decimal(os.environ.get("ORDER_AMOUNT_USD", "100"))
+
+# Map truth engine instrument_symbol → Hummingbot trading pair
+SYMBOL_MAP: Dict[str, str] = {
+    "BTC/USD":  "BTC-USDT",
+    "BTC/USDT": "BTC-USDT",
+    "ETH/USD":  "ETH-USDT",
+    "ETH/USDT": "ETH-USDT",
+    "SOL/USD":  "SOL-USDT",
+    "SOL/USDT": "SOL-USDT",
+}
+
+POLL_SQL = """
+SELECT DISTINCT ON (instrument_symbol)
+    instrument_symbol,
+    edge_direction,
+    edge_score,
+    is_high_confidence,
+    is_toxic_entry,
+    mid_price,
+    bucket_ts
+FROM market.edge_signals_v1
+WHERE edge_score >= %s
+  AND is_toxic_entry = false
+  AND bucket_ts > NOW() - INTERVAL '30 seconds'
+ORDER BY instrument_symbol, bucket_ts DESC
+"""
+
+
+class TruthEnginePaperConfig(StrategyV2ConfigBase):
+    script_file_name: str = "truth_engine_paper.py"
+
+
+class TruthEnginePaperStrategy(StrategyV2Base):
+    """
+    Headless paper trading driven by truth engine edge signals.
+    One active order per symbol — cancels stale orders before replacing.
+    """
+
+    markets = {"binance_paper_trade": {"BTC-USDT", "ETH-USDT", "SOL-USDT"}}
+
+    def __init__(self, connectors: Dict, config: Optional[TruthEnginePaperConfig] = None):
+        super().__init__(connectors, config)
+        self._db_conn: Optional[psycopg2.extensions.connection] = None
+        self._last_poll: float = 0.0
+        self._active_orders: Dict[str, str] = {}  # trading_pair → client_order_id
+
+    # ── DB ────────────────────────────────────────────────────────────────────
+
+    def _ensure_connection(self) -> bool:
+        if self._db_conn and not self._db_conn.closed:
+            return True
+        if not DB_URL:
+            log.error("DATABASE_URL not set — cannot fetch signals")
+            return False
+        try:
+            self._db_conn = psycopg2.connect(DB_URL)
+            self._db_conn.autocommit = True
+            log.info("Connected to Supabase")
+            return True
+        except psycopg2.OperationalError as e:
+            log.error("DB connect failed: %s", e)
+            self._db_conn = None
+            return False
+
+    def _fetch_signals(self) -> List[dict]:
+        if not self._ensure_connection():
+            return []
+        try:
+            with self._db_conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute(POLL_SQL, (EDGE_THRESHOLD,))
+                return cur.fetchall()
+        except Exception as e:
+            log.error("Signal fetch error: %s", e)
+            self._db_conn = None
+            return []
+
+    # ── Strategy tick ─────────────────────────────────────────────────────────
+
+    def on_tick(self):
+        now = time.monotonic()
+        if now - self._last_poll < POLL_INTERVAL_S:
+            return
+        self._last_poll = now
+
+        signals = self._fetch_signals()
+        if not signals:
+            return
+
+        connector = self.connectors["binance_paper_trade"]
+
+        for sig in signals:
+            raw_sym = (sig["instrument_symbol"] or "").upper()
+            trading_pair = SYMBOL_MAP.get(raw_sym)
+            if not trading_pair:
+                continue
+
+            direction = (sig["edge_direction"] or "").upper()
+            if direction not in ("BUY", "SELL"):
+                continue
+
+            mid_price = Decimal(str(sig["mid_price"])) if sig["mid_price"] else None
+            if not mid_price or mid_price <= 0:
+                # fall back to connector best bid/ask
+                try:
+                    mid_price = (
+                        connector.get_price(trading_pair, True)
+                        + connector.get_price(trading_pair, False)
+                    ) / 2
+                except Exception:
+                    continue
+
+            amount = (ORDER_AMOUNT_USD / mid_price).quantize(Decimal("0.00001"))
+            if amount <= 0:
+                continue
+
+            # Cancel prior order for this pair
+            prior_oid = self._active_orders.pop(trading_pair, None)
+            if prior_oid:
+                self.cancel("binance_paper_trade", trading_pair, prior_oid)
+
+            side = TradeType.BUY if direction == "BUY" else TradeType.SELL
+            oid = self.buy("binance_paper_trade", trading_pair, amount, OrderType.MARKET) \
+                  if side == TradeType.BUY \
+                  else self.sell("binance_paper_trade", trading_pair, amount, OrderType.MARKET)
+
+            self._active_orders[trading_pair] = oid
+            log.info(
+                "Paper %s %s qty=%s @ ~%s (edge_score=%s)",
+                direction, trading_pair, amount, mid_price, sig["edge_score"]
+            )
+
+    def on_stop(self):
+        if self._db_conn and not self._db_conn.closed:
+            self._db_conn.close()

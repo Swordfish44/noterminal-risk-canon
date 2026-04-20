@@ -1,0 +1,60 @@
+2026-04-07 09:31:21,831 - 17 - root - INFO - Starting V2 script strategy: truth_engine_paper
+2026-04-07 09:31:21,968 - 17 - hummingbot.core.trading_core - ERROR - Failed to start strategy truth_engine_paper: No module named 'psycopg2'
+2026-04-07 09:31:21,971 - 17 - root - ERROR - Failed to start strategy
+2026-04-07 09:31:21,973 - 17 - root - ERROR - Failed to load strategy. Exiting.
+2026-04-07 09:32:13,574 - 16 - root - INFO - Starting V2 script strategy: truth_engine_paper
+2026-04-07 09:32:13,806 - 16 - hummingbot.core.trading_core - ERROR - Failed to start strategy truth_engine_paper: No module named 'psycopg2'
+2026-04-07 09:32:13,814 - 16 - root - ERROR - Failed to start strategy
+2026-04-07 09:32:13,839 - 16 - root - ERROR - Failed to load strategy. Exiting.
+2026-04-07 09:33:02,206 - 17 - root - INFO - Starting V2 script strategy: truth_engine_paper
+2026-04-07 09:33:02,272 - 17 - hummingbot.core.trading_core - ERROR - Failed to start strategy truth_engine_paper: No module named 'psycopg2'
+2026-04-07 09:33:02,275 - 17 - root - ERROR - Failed to start strategy
+2026-04-07 09:33:02,278 - 17 - root - ERROR - Failed to load strategy. Exiting.
+2026-04-07 09:46:35,403 - 17 - root - INFO - Starting V2 script strategy: truth_engine_paper
+2026-04-07 09:46:35,806 - 17 - hummingbot.core.trading_core - ERROR - Failed to start strategy truth_engine_paper: No module named 'hummingbot.strategy.script_strategy_base'
+2026-04-07 09:46:35,808 - 17 - root - ERROR - Failed to start strategy
+2026-04-07 09:46:35,810 - 17 - root - ERROR - Failed to load strategy. Exiting.
+2026-04-07 09:47:31,993 - 17 - root - INFO - Starting V2 script strategy: truth_engine_paper
+2026-04-07 09:47:32,624 - 17 - hummingbot.core.trading_core - ERROR - Failed to start strategy truth_engine_paper: No module named 'hummingbot.strategy.script_strategy_base'
+2026-04-07 09:47:32,628 - 17 - root - ERROR - Failed to start strategy
+2026-04-07 09:47:32,642 - 17 - root - ERROR - Failed to load strategy. Exiting.
+2026-04-07 09:48:31,647 - 17 - root - INFO - Starting V2 script strategy: truth_engine_paper
+2026-04-07 09:48:31,840 - 17 - hummingbot.core.trading_core - ERROR - Failed to start strategy truth_engine_paper: No module named 'hummingbot.strategy.script_strategy_base'
+2026-04-07 09:48:31,841 - 17 - root - ERROR - Failed to start strategy
+2026-04-07 09:48:31,843 - 17 - root - ERROR - Failed to load strategy. Exiting.
+2026-04-07 09:49:46,897 - 17 - root - INFO - Starting V2 script strategy: truth_engine_paper
+2026-04-07 09:49:48,465 - 17 - hummingbot.core.trading_core - ERROR - Failed to start strategy truth_engine_paper: No module named 'hummingbot.strategy.script_strategy_base'
+2026-04-07 09:49:48,487 - 17 - root - ERROR - Failed to start strategy
+2026-04-07 09:49:48,529 - 17 - root - ERROR - Failed to load strategy. Exiting.
+2026-04-07 09:50:53,695 - 17 - root - INFO - Starting V2 script strategy: truth_engine_paper
+2026-04-07 09:50:53,872 - 17 - hummingbot.core.trading_core - ERROR - Failed to start strategy truth_engine_paper: No module named 'hummingbot.strategy.script_strategy_base'
+2026-04-07 09:50:53,876 - 17 - root - ERROR - Failed to start strategy
+2026-04-07 09:50:53,877 - 17 - root - ERROR - Failed to load strategy. Exiting.
+2026-04-07 09:51:41,599 - 27 - root - INFO - Starting V2 script strategy: truth_engine_paper
+2026-04-07 09:51:41,778 - 27 - hummingbot.core.trading_core - ERROR - Failed to start strategy truth_engine_paper: No module named 'hummingbot.strategy.script_strategy_base'
+2026-04-07 09:51:41,780 - 27 - root - ERROR - Failed to start strategy
+2026-04-07 09:51:41,782 - 27 - root - ERROR - Failed to load strategy. Exiting.
+2026-04-07 09:53:26,013 - 17 - root - INFO - Starting V2 script strategy: truth_engine_paper
+2026-04-07 09:53:26,216 - 17 - hummingbot.core.trading_core - ERROR - Failed to start strategy truth_engine_paper: The module truth_engine_paper does not contain any subclass of StrategyV2ConfigBase
+2026-04-07 09:53:26,217 - 17 - root - ERROR - Failed to start strategy
+2026-04-07 09:53:26,218 - 17 - root - ERROR - Failed to load strategy. Exiting.
+2026-04-07 09:54:23,268 - 18 - root - INFO - Starting V2 script strategy: truth_engine_paper
+2026-04-07 09:54:23,528 - 18 - hummingbot.core.trading_core - ERROR - Failed to start strategy truth_engine_paper: The module truth_engine_paper does not contain any subclass of StrategyV2ConfigBase
+2026-04-07 09:54:23,531 - 18 - root - ERROR - Failed to start strategy
+2026-04-07 09:54:23,533 - 18 - root - ERROR - Failed to load strategy. Exiting.
+2026-04-07 09:55:04,777 - 25 - root - INFO - Starting V2 script strategy: truth_engine_paper
+2026-04-07 09:55:04,985 - 25 - hummingbot.core.trading_core - ERROR - Failed to start strategy truth_engine_paper: The module truth_engine_paper does not contain any subclass of StrategyV2ConfigBase
+2026-04-07 09:55:04,987 - 25 - root - ERROR - Failed to start strategy
+2026-04-07 09:55:04,989 - 25 - root - ERROR - Failed to load strategy. Exiting.
+2026-04-07 09:56:39,317 - 17 - root - INFO - Starting V2 script strategy: truth_engine_paper
+2026-04-07 09:56:42,903 - 17 - hummingbot.core.trading_core - INFO - Markets recorder initialized with database: truth_engine_config
+2026-04-07 09:56:43,304 - 17 - hummingbot.core.trading_core - INFO - Creating the clock with tick size: 1.0
+2026-04-07 09:56:43,313 - 17 - hummingbot.core.trading_core - INFO - Clock started successfully
+2026-04-07 09:56:43,315 - 17 - hummingbot.core.trading_core - INFO - 'truth_engine_paper' strategy execution started.
+2026-04-07 09:56:43,320 - 17 - hummingbot.core.trading_core - INFO - Strategy truth_engine_paper started successfully
+2026-04-07 19:18:59,291 - 17 - root - INFO - Starting V2 script strategy: truth_engine_paper
+2026-04-07 19:19:01,432 - 17 - hummingbot.core.trading_core - INFO - Markets recorder initialized with database: truth_engine_config
+2026-04-07 19:19:01,799 - 17 - hummingbot.core.trading_core - INFO - Creating the clock with tick size: 1.0
+2026-04-07 19:19:01,808 - 17 - hummingbot.core.trading_core - INFO - Clock started successfully
+2026-04-07 19:19:01,814 - 17 - hummingbot.core.trading_core - INFO - 'truth_engine_paper' strategy execution started.
+2026-04-07 19:19:01,821 - 17 - hummingbot.core.trading_core - INFO - Strategy truth_engine_paper started successfully

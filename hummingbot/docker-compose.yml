@@ -1,0 +1,25 @@
+services:
+  hummingbot:
+    build:
+      context: .
+      network: host
+    image: hummingbot-truth-engine:latest
+    container_name: hummingbot
+    restart: unless-stopped
+    env_file:
+      - ../.env
+    volumes:
+      - ./conf:/home/hummingbot/conf
+      - ./logs:/home/hummingbot/logs
+      - ./data:/home/hummingbot/data
+      - ./scripts:/home/hummingbot/scripts
+    environment:
+      # Auth
+      - CONFIG_PASSWORD=${HUMMINGBOT_PASSWORD:-password}
+      # Headless script autostart
+      - HEADLESS_MODE=true
+      - SCRIPT_CONFIG=truth_engine_config.yml
+      # Truth Engine DB + tuning (DATABASE_URL injected via env_file above)
+      - EDGE_THRESHOLD=${EDGE_THRESHOLD:-3}
+      - POLL_INTERVAL_S=${POLL_INTERVAL_S:-10}
+      - ORDER_AMOUNT_USD=${ORDER_AMOUNT_USD:-100}
