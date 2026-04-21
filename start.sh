@@ -17,5 +17,7 @@ set -euo pipefail
   done
 ) &
 
+(while true; do python workers/retention_worker.py; echo "retention_worker exited $? — restarting"; sleep 5; done) &
+
 # Critical worker â€” exit triggers Render restart of the whole service.
 python workers/ops_worker.py
