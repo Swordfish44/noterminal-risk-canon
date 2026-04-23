@@ -13,5 +13,6 @@ set -euo pipefail
 (while true; do python workers/commodity_ingest_worker.py; echo "commodity_ingest_worker exited $? — restarting"; sleep 5; done) &
 (while true; do python workers/kalshi_ingest_worker.py; echo "kalshi_ingest_worker exited $? — restarting"; sleep 5; done) &
 (while true; do python workers/gdelt_ingest_worker.py; echo "gdelt_ingest_worker exited $? — restarting"; sleep 5; done) &
+(while true; do python workers/treasury_yield_worker.py; echo "treasury_yield_worker exited $? — restarting"; sleep 5; done) &
 # Critical worker — exit triggers Render restart of the whole service.
 python workers/ops_worker.py
